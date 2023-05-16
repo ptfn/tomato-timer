@@ -18,5 +18,5 @@ A ready-to-use assembly ```CMakeLists``` has already been written to start.
 mkdir build && cd build
 cmake ..
 cmake --build .
-./main
+./tomato
 ```
