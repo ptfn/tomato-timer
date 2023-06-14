@@ -50,6 +50,38 @@ const bool number[][15] =
     {1,1,1,1,0,1,1,1,1,0,0,1,1,1,1}
 };
 
+void stop()
+{
+    WINDOW *win;
+    uint16_t ch, yMax, xMax;
+    bool run_stopping = true;
+    
+    getmaxyx(stdscr, yMax, xMax); 
+    win = newwin(5, xMax/2, yMax/2-(5/2), xMax/2-(xMax/2)/2); 
+    getmaxyx(win, yMax, xMax);
+    box(win, 0, 0);            
+    
+    wrefresh(win);
+    noecho();        
+
+    mvwprintw(win, 2, xMax/2-2, "%s", "STOP");
+    
+    while (run_stopping) {
+        ch = wgetch(win);
+
+        switch (ch) {
+            case 's': case 'S':
+                run_stopping = false;
+                break;
+ 
+            default:
+                break;
+        }    
+    }
+    delwin(win);
+    wclear(stdscr);
+}
+
 void clock_move(u16 x, u16 y)
 {
     u16 bord_x, bord_y;
@@ -99,12 +131,16 @@ void key_event(void)
             clock_move(timer.geo.x+1, timer.geo.y);
             break;
         
-        case 's': case 'S': case 'q': case 'Q':
+        case 'q': case 'Q':
             timer.run = false;
             break;
 
         case 'c': case 'C':
             center_clock();
+            break;
+
+        case 's': case 'S':
+            stop();
             break;
 
         case '1': case '2': case '3': case '4':
