@@ -4,10 +4,8 @@ My implementation tomato timer on C Language. This implementation is made for te
 
 ## Install
 
-To run it, you must install ```cmake```.
-
 ```
-sudo apt install cmake
+sudo apt install cmake libncurses5-dev libncursesw5-dev 
 ```
 
 ## Run
@@ -18,5 +16,4 @@ A ready-to-use assembly ```CMakeLists``` has already been written to start.
 mkdir build && cd build
 cmake ..
 cmake --build .
-./tomato
 ```
