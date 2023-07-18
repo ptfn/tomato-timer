@@ -5,9 +5,10 @@
 #include <string.h>
 #include <time.h>
 
-#define DELAY 20000
-#define WORK  1500
-#define BREAK 300
+#define WORK    1500
+#define BREAK   300
+#define PATH    ""
+#define MAX_PATH 200
 
 typedef unsigned char   u8;
 typedef unsigned short  u16;
@@ -36,6 +37,9 @@ typedef struct Clock {
 
 Clock timer;
 
+const char *work_text = "'Work time 25 minutes!'"; 
+const char *break_text = "'Break time 5 minutes!'"; 
+
 const bool number[][15] =
 {
     {1,1,1,1,0,1,1,0,1,1,0,1,1,1,1},
@@ -50,7 +54,7 @@ const bool number[][15] =
     {1,1,1,1,0,1,1,1,1,0,0,1,1,1,1}
 };
 
-void stop()
+void stop(void)
 {
     WINDOW *win;
     uint16_t ch, yMax, xMax;
@@ -97,7 +101,7 @@ void clock_move(u16 x, u16 y)
     }
 }
 
-void center_clock()
+void center_clock(void)
 {
     u16 bord_x, bord_y;
     getmaxyx(stdscr, bord_y, bord_x);
@@ -155,19 +159,11 @@ void key_event(void)
     return;
 }
 
-void print_char(u16 x, u16 y)
-{
-    wattron(timer.win, COLOR_PAIR(timer.color));
-    mvwaddch(timer.win, y, x, ' ');
-    mvwaddch(timer.win, y, x+1, ' ');
-    wattroff(timer.win, COLOR_PAIR(timer.color));
-}
-
 void draw_column(u16 x, u16 y)
 {
     for (u16 i = y; i < 5+y;  i++) {
         if (i-y == 1 || i-y == 3) {
-            print_char(x, i);            
+            mvwaddstr(timer.win, i, x, "  ");
         }
     }
 }
@@ -177,7 +173,7 @@ void draw_number(u8 n, u16 x, u16 y)
     for (u16 i = y, iter = 0; i < 5+y;  i++) {
         for (u16 j = x; j < 6+x; j += 2, iter++) {
             if (number[n][iter]) {
-               print_char(j, i); 
+                mvwaddstr(timer.win, i, j, "  ");
             }
         }
     }
@@ -188,29 +184,34 @@ void format(u32 time)
     u8 second = time % 60;
     u8 minute = time / 60;
 
+    wattron(timer.win, COLOR_PAIR(timer.color));
     draw_number(minute / 10, 0, 0);
     draw_number(minute % 10, 8, 0);
     draw_column(16, 0);
     draw_number(second / 10, 20, 0);
     draw_number(second % 10, 28, 0);
+    wattroff(timer.win, COLOR_PAIR(timer.color));
     wrefresh(timer.win);
 }
 
-void notify(char *message)
+void notify(const char *message, char *icon)
 {
-    char command[50] = "notify-send ";
+    char command[200] = "notify-send 'Tomato Clock' ";
+    char *arg = " --icon=";
     strcat(command, message);
+    strcat(command, arg);
+    strcat(command, icon);
     system(command);
 }
 
-void draw_clock()
+void draw_clock(char *work_icon, char *break_icon)
 {
     timer.clock.end = clock() - timer.clock.start;
     u32 time = timer.clock.end / CLOCKS_PER_SEC;
     
     if (timer.clock.state) {
         if (BREAK-time <= 0) {
-            notify("'Tomato Clock' 'Work time 25 minutes!'");
+            notify(work_text, work_icon);
             format(BREAK - time);
             timer.clock.state = false;
             timer.clock.start = clock();
@@ -219,10 +220,10 @@ void draw_clock()
         }
     } else {
         if (WORK-time <= 0) {
-            notify("'Tomato Clock' 'Break time 5 minutes!'");
+            notify(break_text, break_icon); 
+            format(WORK - time);
             timer.clock.state = true;
             timer.clock.start = clock();
-            format(WORK - time);
         } else {
             format(WORK - time);
         }
@@ -254,7 +255,6 @@ int main()
                        timer.geo.w,
                        timer.geo.x,
                        timer.geo.y);
-    box(timer.win, 0, 0);
     wrefresh(timer.win);
 
     init_pair(1, COLOR_GREEN, COLOR_GREEN);
@@ -266,8 +266,16 @@ int main()
     init_pair(7, COLOR_CYAN, COLOR_CYAN);
     init_pair(8, COLOR_WHITE, COLOR_WHITE);
 
+    char work_icon[MAX_PATH], break_icon[MAX_PATH];
+
+    strcat(work_icon, PATH);
+    strcat(break_icon, PATH);
+
+    strcat(work_icon, "/img/work.svg");
+    strcat(break_icon, "/img/break.svg");
+
     while (timer.run) {
-        draw_clock(); 
+        draw_clock(work_icon, break_icon); 
         key_event();
         werase(timer.win);
     }
