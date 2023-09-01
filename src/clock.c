@@ -7,7 +7,7 @@
 
 #define WORK        1500
 #define BREAK       300
-#define PATH        "/home/ptfn/Project/tomato-timer"
+#define PATH        ""
 #define MAX_PATH    200
 
 typedef unsigned char   u8;
@@ -34,6 +34,7 @@ Clock timer;
 
 const char *work_text = "'Work time 25 minutes!'"; 
 const char *break_text = "'Break time 5 minutes!'"; 
+char work_icon[MAX_PATH], break_icon[MAX_PATH];
 
 const bool number[10][15] =
 {
@@ -225,7 +226,16 @@ void state(char *work_icon, char *break_icon)
     }
 }
 
-int main()
+void generate_path(void)
+{
+    strcat(work_icon, PATH);
+    strcat(break_icon, PATH);
+
+    strcat(work_icon,  "/img/work.svg");
+    strcat(break_icon, "/img/break.svg");
+}
+
+void init(void)
 {
     initscr();
     cbreak();
@@ -235,6 +245,8 @@ int main()
     start_color();
     curs_set(false);
     nodelay(stdscr, true);
+
+    generate_path();
 
     timer.geo.x = timer.geo.y = 0;
     timer.geo.h = 5;
@@ -262,13 +274,11 @@ int main()
     init_pair(7, COLOR_CYAN, COLOR_CYAN);
     init_pair(8, COLOR_WHITE, COLOR_WHITE);
 
-    char work_icon[MAX_PATH], break_icon[MAX_PATH];
+}
 
-    strcat(work_icon, PATH);
-    strcat(break_icon, PATH);
-
-    strcat(work_icon,  "/img/work.svg");
-    strcat(break_icon, "/img/break.svg");
+int main()
+{   
+    init();
 
     while (timer.run) {
         time_clock();
