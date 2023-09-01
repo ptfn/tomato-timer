@@ -5,28 +5,23 @@
 #include <string.h>
 #include <time.h>
 
-#define WORK    1500
-#define BREAK   300
-#define PATH    ""
-#define MAX_PATH 200
+#define WORK        1500
+#define BREAK       300
+#define PATH        "/home/ptfn/Project/tomato-timer"
+#define MAX_PATH    200
 
 typedef unsigned char   u8;
 typedef unsigned short  u16;
 typedef unsigned long   u32;
 
 typedef struct Clock {
-    struct 
-    {
-        u16 x;
-        u16 y;
-        u8  h;
-        u8  w;
+    struct {
+        u16 x, y, h, w;
     } geo;
 
-    struct 
-    {
-        clock_t start;
-        clock_t end;
+    struct {
+        time_t  start, end;
+        u16     time;
         bool    state;
     } clock;
   
@@ -40,7 +35,7 @@ Clock timer;
 const char *work_text = "'Work time 25 minutes!'"; 
 const char *break_text = "'Break time 5 minutes!'"; 
 
-const bool number[][15] =
+const bool number[10][15] =
 {
     {1,1,1,1,0,1,1,0,1,1,0,1,1,1,1},
     {0,0,1,0,0,1,0,0,1,0,0,1,0,0,1},
@@ -58,30 +53,35 @@ void stop(void)
 {
     WINDOW *win;
     uint16_t ch, yMax, xMax;
-    bool run_stopping = true;
+    bool run= true;
     
     getmaxyx(stdscr, yMax, xMax); 
     win = newwin(5, xMax/2, yMax/2-(5/2), xMax/2-(xMax/2)/2); 
-    getmaxyx(win, yMax, xMax);
+    xMax = getmaxx(win);
+
     box(win, 0, 0);            
-    
     wrefresh(win);
-    noecho();        
 
     mvwprintw(win, 2, xMax/2-2, "%s", "STOP");
     
-    while (run_stopping) {
+    while (run) {
         ch = wgetch(win);
 
         switch (ch) {
             case 's': case 'S':
-                run_stopping = false;
+                run= false;
+                break;
+            
+            case 'q': case 'Q':
+                timer.run = false;
+                run = false;
                 break;
  
             default:
                 break;
         }    
     }
+
     delwin(win);
     wclear(stdscr);
 }
@@ -95,9 +95,9 @@ void clock_move(u16 x, u16 y)
         && y >= 0 && y <= bord_y-5) {
         timer.geo.x = x;
         timer.geo.y = y;
+        werase(stdscr);
         mvwin(timer.win, timer.geo.y, timer.geo.x);
         wrefresh(timer.win);
-        clear();
     }
 }
 
@@ -105,14 +105,13 @@ void center_clock(void)
 {
     u16 bord_x, bord_y;
     getmaxyx(stdscr, bord_y, bord_x);
-
     clock_move((bord_x / 2 - (timer.geo.w / 2)), 
                (bord_y  / 2 - (timer.geo.h / 2)));
-}
+}        
 
 void key_event(void)
 {
-    struct timespec length = {0, 0};
+    struct timespec length = {1, 0};
     u16 i, c;
     fd_set rfds;
     FD_ZERO(&rfds);
@@ -179,11 +178,12 @@ void draw_number(u8 n, u16 x, u16 y)
     }
 }
 
-void format(u32 time)
+void draw_clock(u32 time)
 {
     u8 second = time % 60;
     u8 minute = time / 60;
 
+    werase(timer.win);
     wattron(timer.win, COLOR_PAIR(timer.color));
     draw_number(minute / 10, 0, 0);
     draw_number(minute % 10, 8, 0);
@@ -197,36 +197,31 @@ void format(u32 time)
 void notify(const char *message, char *icon)
 {
     char command[200] = "notify-send 'Tomato Clock' ";
-    char *arg = " --icon=";
+    char *arg = " --icon='";
     strcat(command, message);
     strcat(command, arg);
     strcat(command, icon);
+    strcat(command, "'");
     system(command);
 }
 
-void draw_clock(char *work_icon, char *break_icon)
+void time_clock(void)
 {
-    timer.clock.end = clock() - timer.clock.start;
-    u32 time = timer.clock.end / CLOCKS_PER_SEC;
-    
-    if (timer.clock.state) {
-        if (BREAK-time <= 0) {
-            notify(work_text, work_icon);
-            format(BREAK - time);
-            timer.clock.state = false;
-            timer.clock.start = clock();
-        } else {
-            format(BREAK - time);
-        }
-    } else {
-        if (WORK-time <= 0) {
-            notify(break_text, break_icon); 
-            format(WORK - time);
-            timer.clock.state = true;
-            timer.clock.start = clock();
-        } else {
-            format(WORK - time);
-        }
+   timer.clock.end = time(NULL);
+    u16 diff = (int)difftime(timer.clock.end, timer.clock.start);
+    timer.clock.time = (timer.clock.state ? BREAK : WORK) - diff;
+}
+
+void state(char *work_icon, char *break_icon)
+{
+    if (timer.clock.state && timer.clock.time <= 0) {
+        notify(work_text, work_icon);
+        timer.clock.state = false;
+        timer.clock.start = time(NULL); 
+    } else if (!(timer.clock.state) && timer.clock.time <= 0) {
+        notify(break_text, break_icon); 
+        timer.clock.state = true;
+        timer.clock.start = time(NULL); 
     }
 }
 
@@ -244,7 +239,7 @@ int main()
     timer.geo.x = timer.geo.y = 0;
     timer.geo.h = 5;
     timer.geo.w = 34;
-    timer.clock.start = clock();
+    timer.clock.start = time(NULL);
     timer.clock.state = false;
 
     timer.color = 1;
@@ -255,6 +250,7 @@ int main()
                        timer.geo.w,
                        timer.geo.x,
                        timer.geo.y);
+    
     wrefresh(timer.win);
 
     init_pair(1, COLOR_GREEN, COLOR_GREEN);
@@ -271,14 +267,17 @@ int main()
     strcat(work_icon, PATH);
     strcat(break_icon, PATH);
 
-    strcat(work_icon, "/img/work.svg");
+    strcat(work_icon,  "/img/work.svg");
     strcat(break_icon, "/img/break.svg");
 
     while (timer.run) {
-        draw_clock(work_icon, break_icon); 
+        time_clock();
+        draw_clock(timer.clock.time);
+        state(work_icon, break_icon);
         key_event();
-        werase(timer.win);
     }
+
+    delwin(timer.win);
     endwin();
     return 0;
 }
